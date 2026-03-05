@@ -24,6 +24,7 @@ node skills/helius-top-volume/scripts/helius_top_volume.mjs "helius top-volume"
 | `helius top-volume --count 20` | Show top 20 |
 | `helius top-volume --min-volume 100000` | Require at least `$100k` 24h volume |
 | `helius top-volume --format json` | Output machine-readable JSON |
+| `helius top-volume --api-key YOUR_CG_KEY` | Use CoinGecko API key for this run |
 
 ### Flags
 
@@ -32,6 +33,7 @@ node skills/helius-top-volume/scripts/helius_top_volume.mjs "helius top-volume"
 - `--per-page N` – page size, max `250` (default `250`)
 - `--min-volume USD` – minimum 24h USD volume
 - `--format json` – compact JSON output
+- `--api-key <key>` – optional CoinGecko API key
 - `--help` – show command help
 
 ## 🧩 Helius integration (conservative usage)
@@ -45,6 +47,15 @@ Helius key resolution:
 1. `HELIUS_API_KEY`
 2. `HELIUS_KEY`
 3. macOS Keychain (service: `HELIUS_API_KEY`, account: `openclaw-helius`)
+
+### CoinGecko API key source (optional)
+
+- `--api-key <key>` (CLI argument)
+- `COINGECKO_API_KEY` env
+- `COINGECKO_KEY` env
+- macOS Keychain (service: `COINGECKO_API_KEY`, account: `openclaw-coingecko`)
+
+If no key is found, script uses public CoinGecko endpoints.
 
 ## 🧪 Example output
 
@@ -71,5 +82,5 @@ Clawberto-shitcoins-helius/
 ## 🛡️ Notes
 
 - Market ranking uses CoinGecko `coins/markets` (24h volume).
-- Helius is used for enrichment only and is optional for operation.
+- Helius is used for enrichment only and is optional for operation; CoinGecko key is optional and improves reliability.
 - If no Helius key is available, results still return with `helius_price_usd: n/a` in JSON.

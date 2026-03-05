@@ -12,6 +12,7 @@ A compact OpenClaw skill for quickly discovering **high-volume Solana tokens** o
 - Pulls token market snapshots from CoinGecko (`coins/markets`), ordered by `24h volume`.
 - Filters to tokens that have a Solana mint address.
 - Pulls Helius details for the selected mints using **one** RPC batch call (`getAssetBatch`).
+- Supports optional CoinGecko API key for higher request capacity (`--api-key`, env, or macOS Keychain).
 - Returns top tokens ranked by 24h volume with:
   - symbol/name
   - mint address
@@ -35,6 +36,7 @@ node skills/helius-top-volume/scripts/helius_top_volume.mjs "helius top-volume"
 node skills/helius-top-volume/scripts/helius_top_volume.mjs "helius top-volume --count 10"
 node skills/helius-top-volume/scripts/helius_top_volume.mjs "helius top-volume --min-volume 50000 --pages 6"
 node skills/helius-top-volume/scripts/helius_top_volume.mjs "helius top-volume --format json"
+node skills/helius-top-volume/scripts/helius_top_volume.mjs "helius top-volume --api-key YOUR_CG_KEY --count 10"
 ```
 
 ## Supported arguments
@@ -44,17 +46,23 @@ node skills/helius-top-volume/scripts/helius_top_volume.mjs "helius top-volume -
 - `--per-page N`        Page size for market scan, max `250` (default: `250`)
 - `--min-volume USD`    Minimum 24h volume filter
 - `--format json`       Emit JSON output
+- `--api-key <key>`    CoinGecko API key (optional)
 - `--help`              Show usage
 
-### Helius key source
+### Key source
 
-The script resolves the API key in this order:
-
+**Helius (optional, for enrichment)**
 1. `HELIUS_API_KEY`
 2. `HELIUS_KEY`
 3. macOS Keychain (`service: HELIUS_API_KEY`, `account: openclaw-helius`)
 
-If no key is available, output still works with CoinGecko-only data.
+**CoinGecko (optional, for ranking/rate limit handling)**
+1. `--api-key`
+2. `COINGECKO_API_KEY`
+3. `COINGECKO_KEY`
+4. macOS Keychain (`service: COINGECKO_API_KEY`, `account: openclaw-coingecko`)
+
+If no CoinGecko key is available, the script uses public endpoints (subject to rate limits).
 
 ## Output modes
 
@@ -70,6 +78,7 @@ Top 10 Solana tokens by 24h volume (CoinGecko, enriched via Helius)
 
 ```bash
 node skills/helius-top-volume/scripts/helius_top_volume.mjs "helius top-volume --format json"
+node skills/helius-top-volume/scripts/helius_top_volume.mjs "helius top-volume --api-key YOUR_CG_KEY --count 10"
 ```
 
 Will include:

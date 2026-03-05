@@ -11,6 +11,8 @@ const COINGECKO_BASE = "https://api.coingecko.com/api/v3";
 const HELIUS_RPC = "https://mainnet.helius-rpc.com/?api-key=";
 const KEYCHAIN_SERVICE = "HELIUS_API_KEY";
 const KEYCHAIN_ACCOUNT = "openclaw-helius";
+const COINGECKO_KEYCHAIN_SERVICE = "COINGECKO_API_KEY";
+const COINGECKO_KEYCHAIN_ACCOUNT = "openclaw-coingecko";
 
 function log(...args) {
   // eslint-disable-next-line no-console
@@ -31,6 +33,7 @@ Examples:
   node skills/helius-top-volume/scripts/helius_top_volume.mjs "helius top-volume --count 15 --pages 4"
   node skills/helius-top-volume/scripts/helius_top_volume.mjs "helius top-volume --min-volume 100000"
   node skills/helius-top-volume/scripts/helius_top_volume.mjs "helius top-volume --format json"
+  node skills/helius-top-volume/scripts/helius_top_volume.mjs "helius top-volume --api-key ${COINGECKO_API_KEY} --count 10"
 
 Flags:
   --count <n>             Number of top tokens to show (default: ${DEFAULT_COUNT})
@@ -38,6 +41,7 @@ Flags:
   --per-page <n>          CoinGecko page size (default: ${DEFAULT_MARKETS_PER_PAGE}, max 250)
   --min-volume <usd>      Minimum 24h volume filter (optional)
   --format json            Output JSON only
+  --api-key <key>         CoinGecko API key (or COINGECKO_API_KEY/COINGECKO_KEY env or keychain)
   --help, -h               Show this help
 `);
 }
@@ -104,6 +108,7 @@ function parseInput(raw) {
     const aliasPages = args.pages ?? args.page;
     const aliasPerPage = args["per-page"] ?? args.perpage;
     const aliasMinVol = args["min-volume"] ?? args.minvolume ?? args.min;
+    const aliasApiKey = args["api-key"] ?? args["coingecko-key"] ?? args["cg-key"] ?? args.key ?? args.apikey;
     const fmt = args.format ?? args.f;
 
     if (fmt === "json") out.format = "json";
@@ -111,6 +116,7 @@ function parseInput(raw) {
     out.pages = normalizeInt(aliasPages, DEFAULT_MARKETS_PAGES, 1, 20);
     out.perPage = normalizeInt(aliasPerPage, DEFAULT_MARKETS_PER_PAGE, 1, 250);
     out.minVolume = normalizeFloat(aliasMinVol, 0, 0);
+    out.apiKey = aliasApiKey ?? null;
 
     return out;
   }
@@ -126,6 +132,7 @@ function parseInput(raw) {
       pages: DEFAULT_MARKETS_PAGES,
       perPage: DEFAULT_MARKETS_PER_PAGE,
       minVolume: normalizeFloat(minVolumeMatch ? minVolumeMatch[1] : 0, 0, 0),
+      apiKey: args["api-key"] ?? args["coingecko-key"] ?? args["cg-key"] ?? args.key ?? args.apikey,
       format: args.format === "json" ? "json" : "text",
     };
   }
@@ -161,6 +168,50 @@ function toPct(value, fallback = 0) {
   return `${n >= 0 ? "+" : "-"}${Math.abs(n).toFixed(2)}%`;
 }
 
+function getCoinGeckoApiKey(explicit) {
+  if (explicit) return explicit;
+  if (process.env.COINGECKO_API_KEY) return process.env.COINGECKO_API_KEY;
+  if (process.env.COINGECKO_KEY) return process.env.COINGECKO_KEY;
+
+  try {
+    if (process.platform === "darwin") {
+      const key = execSync(
+        `security find-generic-password -s ${JSON.stringify(COINGECKO_KEYCHAIN_SERVICE)} -a ${JSON.stringify(COINGECKO_KEYCHAIN_ACCOUNT)} -w`,
+        {
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "ignore"],
+        },
+      ).trim();
+      if (key) return key;
+    }
+  } catch {
+    // no-op
+  }
+
+  return "";
+}
+
+function coingeckoFetch(url, { apiKey, ...options } = {}) {
+  const target = new URL(url);
+  if (apiKey) {
+    target.searchParams.set("x_cg_api_key", apiKey);
+    target.searchParams.set("x_cg_demo_api_key", apiKey);
+    target.searchParams.set("x_cg_pro_api_key", apiKey);
+  }
+
+  const headers = { ...(options.headers || {}) };
+  if (apiKey) {
+    headers["x-cg-api-key"] = apiKey;
+    headers["x-cg-demo-api-key"] = apiKey;
+    headers["x-cg-pro-api-key"] = apiKey;
+  }
+
+  return fetchWithTimeout(target.toString(), {
+    ...options,
+    headers,
+  });
+}
+
 function fetchWithTimeout(url, options = {}, timeoutMs = 15000, retries = 1) {
   const attempt = async (n) => {
     const controller = new AbortController();
@@ -190,9 +241,9 @@ function fetchWithTimeout(url, options = {}, timeoutMs = 15000, retries = 1) {
   return attempt(0);
 }
 
-async function fetchCoinListPlatforms() {
+async function fetchCoinListPlatforms({ apiKey } = {}) {
   const url = `${COINGECKO_BASE}/coins/list?include_platform=true`;
-  const payload = await fetchWithTimeout(url);
+  const payload = await coingeckoFetch(url, { apiKey });
 
   const out = new Map();
   for (const coin of payload) {
@@ -205,7 +256,7 @@ async function fetchCoinListPlatforms() {
   return out;
 }
 
-async function fetchTopMarketsByVolume({ count, pages, perPage }) {
+async function fetchTopMarketsByVolume({ count, pages, perPage, apiKey }) {
   const out = [];
   for (let page = 1; page <= pages; page++) {
     const url = new URL(`${COINGECKO_BASE}/coins/markets`);
@@ -216,7 +267,7 @@ async function fetchTopMarketsByVolume({ count, pages, perPage }) {
     url.searchParams.set("sparkline", "false");
     url.searchParams.set("price_change_percentage", "24h");
 
-    const batch = await fetchWithTimeout(url.toString());
+    const batch = await coingeckoFetch(url.toString(), { apiKey });
     if (!Array.isArray(batch)) break;
     out.push(...batch);
     if (batch.length < perPage) break;
@@ -275,8 +326,10 @@ function getHeliusApiKey() {
   try {
     if (process.platform === "darwin") {
       const key = execSync(`security find-generic-password -s ${JSON.stringify(KEYCHAIN_SERVICE)} -a ${JSON.stringify(KEYCHAIN_ACCOUNT)} -w`, {
-        encoding: "utf8",
-      }).trim();
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "ignore"],
+        }
+      ).trim();
       if (key) return key;
     }
   } catch {
@@ -369,11 +422,12 @@ function printText(rows, options, scannedMarkets) {
 }
 
 async function runTopVolume(opts) {
-  const { count, pages, perPage, minVolume, format } = opts;
+  const { count, pages, perPage, minVolume, format, apiKey } = opts;
+  const effectiveCoinGeckoApiKey = getCoinGeckoApiKey(apiKey);
 
-  const solanaMap = await fetchCoinListPlatforms();
+  const solanaMap = await fetchCoinListPlatforms({ apiKey: effectiveCoinGeckoApiKey });
 
-  const markets = await fetchTopMarketsByVolume({ count, pages, perPage });
+  const markets = await fetchTopMarketsByVolume({ count, pages, perPage, apiKey: effectiveCoinGeckoApiKey });
   const topTokens = pickSolanaTokensFromMarkets(markets, solanaMap, { count: count * 2, minVolume });
 
   if (!topTokens.length) {
@@ -433,6 +487,7 @@ async function main() {
         pages: parsed.pages,
         perPage: parsed.perPage,
         minVolume: parsed.minVolume,
+        apiKey: parsed.apiKey,
         format: parsed.format,
       });
       return;
