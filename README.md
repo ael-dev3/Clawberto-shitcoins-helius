@@ -1,73 +1,94 @@
-# 🛰️ Clawberto Shitcoins - Helius Top Volume
+# Clawberto Shitcoins - Helius Top Volume
 
-A focused OpenClaw skill for pulling **top Solana tokens by 24h volume** and enriching results with Helius metadata.
+This repo provides a single OpenClaw skill that scans the top Solana shitcoins by 24h volume using Helius-owned surfaces only.
 
-## ✨ What this gives you
+## What it does
 
-- Pulls the latest Solana market movers by `24h volume`.
-- Limits output to the **top N** tokens (default: `10`).
-- Enriches with Helius `getAssetBatch` metadata in one batched RPC call.
-- Supports JSON mode for automation workflows.
+- Keeps the entrypoint stable at `skills/helius-top-volume/scripts/helius_top_volume.mjs`.
+- Uses the Helius-owned Orb Markets page as the ranking source.
+- Defines `shitcoins` explicitly as tokens shown in Orb's `Cults` category.
+- Reads the `24h` ranking from Orb's public page state and returns the top `N` rows.
+- Optionally enriches the selected mints with one Helius DAS `getAssetBatch` call.
+- Supports plain-text and JSON output.
 
-## 🚀 Quick Start
+## Exact methodology
+
+There is no documented single Helius API endpoint that returns `top Solana shitcoins by 24h volume`.
+
+This skill therefore uses the best honest Helius-only path available:
+
+1. Fetch the public Helius-owned Orb Markets page.
+2. Treat Orb's `Cults` category as the shitcoin universe.
+3. Extract structured market rows from the Orb page state for the `24h` view.
+4. Sort by `24h volume`, apply `--min-volume` if provided, and keep the top `--count` rows.
+5. If a Helius API key is available, enrich those mints with one batched DAS `getAssetBatch` call.
+
+## Limitations
+
+- Helius does not currently document a dedicated top-volume endpoint for this workflow.
+- Ranking depends on Orb continuing to expose structured Cults market state in its public page output.
+- `shitcoins` are not custom-classified here; they are exactly Orb `Cults` tokens.
+- Orb ranking can work without a Helius API key. DAS enrichment needs a Helius key.
+
+## Quick start
 
 ```bash
 cd Clawberto-shitcoins-helius
 node skills/helius-top-volume/scripts/helius_top_volume.mjs "helius top-volume"
 ```
 
-## 🔌 Commands
+That command scans the top 10 Solana shitcoins by 24h volume.
+
+## Commands
 
 | Command | What it does |
 |---|---|
-| `helius top-volume` | Fetch top Solana tokens by 24h volume |
-| `helius top-volume --count 20` | Show top 20 |
+| `helius top-volume` | Scan the top 10 Orb Cults tokens by 24h volume |
+| `helius top-volume --count 20` | Return the top 20 instead of 10 |
 | `helius top-volume --min-volume 100000` | Require at least `$100k` 24h volume |
-| `helius top-volume --format json` | Output machine-readable JSON |
-| `helius top-volume --api-key YOUR_CG_KEY` | Use CoinGecko API key for this run |
+| `helius top-volume --format json` | Emit machine-readable JSON |
 
-### Flags
+## Flags
 
-- `--count N` – how many results (default `10`)
-- `--pages N` – how many CoinGecko market pages to scan (default `5`)
-- `--per-page N` – page size, max `250` (default `250`)
-- `--min-volume USD` – minimum 24h USD volume
-- `--format json` – compact JSON output
-- `--api-key <key>` – optional CoinGecko API key
-- `--help` – show command help
+- `--count N` - number of ranked tokens to return, default `10`
+- `--min-volume USD` - minimum 24h USD volume filter
+- `--format json` - output JSON only
+- `--help` - show command help
 
-## 🧩 Helius integration (conservative usage)
+## Helius key resolution
 
-This skill is designed to keep Helius usage low:
+The script looks for a Helius key in this order:
 
-- **1** Helius call for the token list (`getAssetBatch`)
-- No per-token Helius loops
-
-Helius key resolution:
 1. `HELIUS_API_KEY`
 2. `HELIUS_KEY`
-3. macOS Keychain (service: `HELIUS_API_KEY`, account: `openclaw-helius`)
+3. macOS Keychain service `HELIUS_API_KEY`, account `openclaw-helius`
 
-### CoinGecko API key source (optional)
+If no Helius key is found, the scan still returns Orb-ranked tokens, but the extra DAS enrichment fields remain empty.
 
-- `--api-key <key>` (CLI argument)
-- `COINGECKO_API_KEY` env
-- `COINGECKO_KEY` env
-- macOS Keychain (service: `COINGECKO_API_KEY`, account: `openclaw-coingecko`)
+## Output
 
-If no key is found, script uses public CoinGecko endpoints.
+Default text output includes:
 
-## 🧪 Example output
+- rank
+- symbol
+- name
+- mint
+- 24h volume
+- Orb price when present in the Orb market row
+- Helius DAS price when present in `token_info.price_info`
+- Orb token page URLs listed after the table
 
-```text
-Top 10 Solana tokens by 24h volume (CoinGecko, enriched via Helius)
-| # | Symbol | Name | Mint | 24h Volume | 24h Change | CG Price | Helius Price |
-|---|---|---|---|---|---|---|---|
-| 1 | WIF | dogwifhat | H9x... | $12,345,678.00 | +12.41% | $0.45 | $0.44 |
-...
-```
+JSON output also includes:
 
-## 🧭 Repo layout
+- `source`
+- `methodology`
+- `limitations`
+- `filters`
+- `orb.sourceUrl`
+- `orb.extractionPath`
+- `tokens[].orb_url`
+
+## Repo layout
 
 ```text
 Clawberto-shitcoins-helius/
@@ -78,9 +99,3 @@ Clawberto-shitcoins-helius/
 │     └─ scripts/
 │        └─ helius_top_volume.mjs
 ```
-
-## 🛡️ Notes
-
-- Market ranking uses CoinGecko `coins/markets` (24h volume).
-- Helius is used for enrichment only and is optional for operation; CoinGecko key is optional and improves reliability.
-- If no Helius key is available, results still return with `helius_price_usd: n/a` in JSON.
