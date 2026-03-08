@@ -1,6 +1,6 @@
 ---
 name: helius-top-volume
-description: Scan the top Solana shitcoins by 24h volume using Helius-owned Orb market data only, with optional batched Helius DAS enrichment.
+description: Scan the top Solana shitcoins by 24h volume using Helius-owned Orb API data only, with optional batched Helius DAS enrichment.
 ---
 
 # Helius Top Volume
@@ -15,21 +15,22 @@ Use this skill to scan the top Solana shitcoins by `24h` volume using Helius-own
 
 ## Real behavior
 
-There is no documented single Helius API endpoint that directly returns `top Solana shitcoins by 24h volume`.
+This skill uses the Helius-owned Orb API directly:
 
-This skill therefore uses the best honest Helius-only workflow available:
-
-1. Fetch the public Helius-owned Orb Markets page.
-2. Extract structured market rows for the `Cults` category.
-3. Rank those rows by `24h volume`.
+1. Authenticate against Orb via `POST /api/turnstile/verify`.
+2. Query Orb assets with:
+   - `timeframe=24h`
+   - `category=Cults`
+   - `sort_by=volume`
+3. Rank the returned rows by `24h volume`.
 4. Apply `--min-volume` if requested and keep the top `--count` rows.
 5. If a Helius API key is available, enrich the selected mints with one DAS `getAssetBatch` call.
 
 ## Limitations
 
-- Ranking depends on Orb continuing to expose structured Cults market state publicly.
 - The classification is exactly Orb `Cults`; this skill does not invent a separate meme-token classifier.
 - Orb ranking can run without a Helius API key. DAS enrichment requires a Helius key.
+- If Orb changes its auth or assets API contract, the scan may need to be updated.
 
 ## Usage
 
