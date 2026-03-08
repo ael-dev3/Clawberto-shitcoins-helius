@@ -9,6 +9,8 @@ This repo provides a single OpenClaw skill that scans the top Solana shitcoins b
 - Defines `shitcoins` explicitly as tokens shown in Orb's `Cults` category.
 - Reads the `24h` ranking from Orb and returns the top `N` rows.
 - Optionally enriches the selected mints with one Helius DAS `getAssetBatch` call.
+- Gracefully falls back to Orb-only output if DAS enrichment fails.
+- Reports requested count vs returned count when Orb currently has fewer Cults rows available.
 - Supports plain-text and JSON output.
 
 ## Exact methodology
@@ -44,6 +46,7 @@ That command scans the top 10 Solana shitcoins by 24h volume.
 | Command | What it does |
 |---|---|
 | `helius top-volume` | Scan the top 10 Orb Cults tokens by 24h volume |
+| `helius scan 10` | Alias for scanning the top 10 |
 | `helius top-volume --count 20` | Return the top 20 instead of 10 |
 | `helius top-volume --min-volume 100000` | Require at least `$100k` 24h volume |
 | `helius top-volume --format json` | Emit machine-readable JSON |
@@ -63,12 +66,13 @@ The script looks for a Helius key in this order:
 2. `HELIUS_KEY`
 3. macOS Keychain service `HELIUS_API_KEY`, account `openclaw-helius`
 
-If no Helius key is found, the scan still returns Orb-ranked tokens, but the extra DAS enrichment fields remain empty.
+If no Helius key is found, the scan still returns Orb-ranked tokens, but the extra DAS enrichment fields remain empty. If DAS enrichment errors out for any reason, the script now degrades gracefully and still returns the Orb ranking with a warning.
 
 ## Output
 
 Default text output includes:
 
+- requested count vs returned count
 - rank
 - symbol
 - name
@@ -77,14 +81,18 @@ Default text output includes:
 - Orb price when present in Orb
 - Helius DAS price when present in `token_info.price_info`
 - Orb token page URL
+- warnings when enrichment is skipped
 
 JSON output also includes:
 
 - `source`
 - `methodology`
 - `limitations`
+- `warnings`
 - `filters`
 - `orb`
+- `totals.requestedCount`
+- `totals.returnedCount`
 - `tokens[].orb_url`
 
 ## Repo layout

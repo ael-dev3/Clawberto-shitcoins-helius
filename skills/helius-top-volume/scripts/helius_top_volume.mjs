@@ -89,9 +89,9 @@ function parseInput(raw) {
     return { command: "help", args };
   }
 
-  if (first === "top-volume" || first === "top-volume-24h" || first === "top" || first === "top10") {
+  if (first === "top-volume" || first === "top-volume-24h" || first === "top" || first === "top10" || first === "scan" || first === "list") {
     let inferredCount = null;
-    if (first === "top" && /^\d+$/.test(String(positional[1] || ""))) {
+    if ((first === "top" || first === "scan" || first === "list") && /^\d+$/.test(String(positional[1] || ""))) {
       inferredCount = Number(positional[1]);
     }
 
@@ -278,6 +278,7 @@ async function fetchOrbTopCults({ count, minVolume }) {
       category: "Cults",
       sortBy: "volume",
     },
+    assetRowsReceived: assets.length,
   };
 }
 
@@ -347,12 +348,19 @@ function buildRows(rows, heliusAssets) {
   });
 }
 
-function printText(rows, { minVolume }) {
+function printText(rows, { requestedCount, minVolume, warnings = [], assetRowsReceived = rows.length }) {
   log(`Top ${rows.length} Solana shitcoins by 24h volume (Helius Orb Cults)`);
   log(`Definition: shitcoins = Orb category \"Cults\".`);
   log(`Method: Orb API 24h Cults ranking -> optional Helius DAS getAssetBatch enrichment.`);
+  log(`Requested count: ${requestedCount} | Orb rows received: ${assetRowsReceived} | Returned rows: ${rows.length}`);
   if (minVolume > 0) {
     log(`Min 24h volume filter: ${toUsd(minVolume)}`);
+  }
+  if (requestedCount > rows.length) {
+    log(`Note: Orb currently returned fewer than requested (${rows.length}/${requestedCount}).`);
+  }
+  for (const warning of warnings) {
+    log(`Warning: ${warning}`);
   }
   log("");
 
@@ -382,7 +390,14 @@ async function runTopVolume(opts) {
     return;
   }
 
-  const heliusAssets = await fetchHeliusEnrichment(orb.rows.map((row) => row.mint));
+  const warnings = [];
+  let heliusAssets = new Map();
+  try {
+    heliusAssets = await fetchHeliusEnrichment(orb.rows.map((row) => row.mint));
+  } catch (error) {
+    warnings.push(`Helius DAS enrichment skipped: ${error?.message || String(error)}`);
+  }
+
   const rows = buildRows(orb.rows, heliusAssets);
 
   if (format === "json") {
@@ -395,15 +410,20 @@ async function runTopVolume(opts) {
         "Ranking depends on the Helius-owned Orb API remaining available.",
         "DAS enrichment requires a Helius API key; the Orb ranking itself does not.",
       ],
+      warnings,
       filters: {
-        count,
+        requestedCount: count,
         minVolume,
         timeframe: "24h",
         classification: "Cults",
       },
-      orb: orb.query,
+      orb: {
+        ...orb.query,
+        assetRowsReceived: orb.assetRowsReceived,
+      },
       totals: {
-        tokenRows: rows.length,
+        requestedCount: count,
+        returnedCount: rows.length,
         heliusEnrichedRows: rows.filter((row) => row.helius_enriched).length,
       },
       tokens: rows,
@@ -411,7 +431,12 @@ async function runTopVolume(opts) {
     return;
   }
 
-  printText(rows, { minVolume });
+  printText(rows, {
+    requestedCount: count,
+    minVolume,
+    warnings,
+    assetRowsReceived: orb.assetRowsReceived,
+  });
 }
 
 async function main() {

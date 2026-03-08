@@ -25,6 +25,7 @@ This skill uses the Helius-owned Orb API directly:
 3. Rank the returned rows by `24h volume`.
 4. Apply `--min-volume` if requested and keep the top `--count` rows.
 5. If a Helius API key is available, enrich the selected mints with one DAS `getAssetBatch` call.
+6. If DAS enrichment fails, still return the Orb ranking and attach a warning instead of failing the whole scan.
 
 ## Limitations
 
@@ -36,6 +37,7 @@ This skill uses the Helius-owned Orb API directly:
 
 ```bash
 node skills/helius-top-volume/scripts/helius_top_volume.mjs "helius top-volume"
+node skills/helius-top-volume/scripts/helius_top_volume.mjs "helius scan 10"
 node skills/helius-top-volume/scripts/helius_top_volume.mjs "helius top-volume --count 10"
 node skills/helius-top-volume/scripts/helius_top_volume.mjs "helius top-volume --min-volume 50000"
 node skills/helius-top-volume/scripts/helius_top_volume.mjs "helius top-volume --format json"
@@ -67,3 +69,5 @@ The command returns a directly usable ranked list with at least:
 - Orb token URL
 
 When DAS enrichment succeeds it also includes Helius metadata and price fields from `getAssetBatch`.
+
+Text and JSON output also report requested count vs returned count, which matters when Orb currently exposes fewer than 10 Cults rows.
