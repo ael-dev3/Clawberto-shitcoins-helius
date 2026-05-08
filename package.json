@@ -1,0 +1,10 @@
+{
+  "name": "clawberto-shitcoins-helius",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "help": "node skills/helius-top-volume/scripts/helius_top_volume.mjs \"helius help\"",
+    "check": "npm run help"
+  }
+}
