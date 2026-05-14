@@ -2,6 +2,7 @@
 // Helius-only scanner: Orb Cults 24h top-volume ranking + optional DAS enrichment.
 
 import { execSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
 
 const DEFAULT_COUNT = 10;
 const DEFAULT_MIN_VOLUME = 0;
@@ -53,7 +54,7 @@ Helius DAS enrichment key sources:
 `);
 }
 
-function parseInput(raw) {
+export function parseInput(raw) {
   const input = String(raw || "").trim();
   if (!input) return { command: "help", args: {} };
 
@@ -98,7 +99,7 @@ function parseInput(raw) {
     return {
       command: "top-volume",
       args,
-      count: normalizeInt(args.count ?? args.n ?? args.top ?? inferredCount, DEFAULT_COUNT, 1, 100),
+      count: normalizeInt(args.count ?? args.n ?? args.top ?? inferredCount ?? DEFAULT_COUNT, DEFAULT_COUNT, 1, 100),
       minVolume: normalizeFloat(args["min-volume"] ?? args.minvolume ?? args.min, DEFAULT_MIN_VOLUME, 0),
       format: args.format === "json" ? "json" : "text",
     };
@@ -463,4 +464,8 @@ async function main() {
   }
 }
 
-main();
+const isDirectRun = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isDirectRun) {
+  main();
+}

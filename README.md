@@ -41,6 +41,15 @@ node skills/helius-top-volume/scripts/helius_top_volume.mjs "helius top-volume"
 
 That command scans the top 10 Solana shitcoins by 24h volume.
 
+## Local validation
+
+```bash
+npm run check
+```
+
+The check command keeps the existing help smoke and also runs offline parser
+fixtures for aliases, JSON format, count clamping, and minimum-volume parsing.
+
 ## Commands
 
 | Command | What it does |

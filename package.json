@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "help": "node skills/helius-top-volume/scripts/helius_top_volume.mjs \"helius help\"",
-    "check": "npm run help"
+    "test": "node --test",
+    "check": "npm run help && npm test"
   }
 }
